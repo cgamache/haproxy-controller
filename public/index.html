@@ -1,0 +1,252 @@
+<html>
+	<head>
+		<title>haproxy controller</title>
+		<link rel="stylesheet" href="css/ui-lightness/jquery-ui-1.9.2.custom.min.css" />
+		<script type="text/javascript" src="js/jquery-1.8.3.min.js"></script>
+		<script type="text/javascript" src="js/jquery-ui-1.9.2.custom.min.js"></script>
+		<style type="text/css">
+		    .backend { width: 500px; margin-bottom: 5px;}
+			.backend .name { padding:5px; }
+			.server { width: 490px; padding: 5px;}
+			.backend .servers { display: table-row; margin-bottom: 15px;}
+			.servers .value { float: right;}
+			.server { border-bottom: 1px solid white;}
+			.ui-widget {font-size: .9em}
+			#haproxy_batch {position: fixed; float: left; z-index: 99; height: 90%; margin-left: 50%; width: 45%;}	
+			#haproxy_batch_text {height: 100%; width:100%;}	
+		</style>
+		<script type="text/javascript">
+
+			$.widget("haproxy.backend", {
+				options: {},
+				empty: '<div class="backend ui-widget ui-widget-content" data-backend="">' + 
+					'<div class="ui-widget-header ui-corner-tl ui-corner-tr ui-helper-clearfix"><span class="expanded ui-icon ui-icon-triangle-1-e" style="float: left"></span><span class="name"></span></div>' + 
+					'<div class="servers"></div>' + 
+				'</div>',
+				_create: function () {					
+				},
+				set: function(data) {
+					var self = this, o = self.options, elem = self.element;
+					$.each(data, function(key,value) {
+						elem.find('.server[data-server="' + key + '"]').parent().each(function (ord,svr) {
+								var serverData = {};
+								serverData[key] = value;
+								$(svr).server('set',serverData);
+						});
+					});
+				},
+				draw: function(data) {
+					var self = this, o = self.options, elem = self.element,k,v;
+					var $backend = elem.append(self.empty);
+					$.each(data, function(key,value) {
+						k = key;
+						v = value;
+					});
+					$backend.find('.backend').attr('data-backend', k);
+					$backend.find('.backend .name').html(k);
+					$backend.find('.ui-widget-header').click(function(event) {
+						$(this).parent().find('.server').slideToggle('fast');
+						var on = ($(this).parent().find('.expanded').hasClass('ui-icon-triangle-1-e')) ? 'ui-icon-triangle-1-s' : 'ui-icon-triangle-1-e';
+						var off = (on === 'ui-icon-triangle-1-e') ? 'ui-icon-triangle-1-s' : 'ui-icon-triangle-1-e';
+						$(this).parent().find('.expanded').removeClass(off).addClass(on);
+					});
+					var $servers = $backend.find('.servers')
+					$.each(v, function(key, value) {
+						var serverData = {};
+						serverData[key] = value;
+						var $server = $('<div />').server();
+						$servers.append($server);
+						$server.server('draw',serverData);					
+					});
+					
+					$(elem).find('.server').hide();
+				}
+			});
+
+			$.widget("haproxy.server", {
+				options: {},
+				empty: '<div class="server ui-corner-bl ui-corner-br" data-server="" data-iid="" data-sid="">' + 
+					'<div class="server_id">ID <span class="value"></span><button class="batch">BATCH</button></div>' + 
+					'<div class="weight">Weight <input class="value" /><button class="set">SET</button></div>' + 
+					'<div class="status">Status <span class="value"></span></div>' + 
+					'<div class="set_status">' +
+						'<button class="status_enabled">UP</button>' + 
+						'<button class="status_disabled">MAINT</button>' + 
+					'</div>' +
+				'</div>',				
+				_create: function () {
+				},
+				set: function(data) {
+					var self = this, o = self.options, elem = self.element,k,v;
+					$.each(data, function (key,value) {
+						k = key;
+						v = value;
+					});
+					elem.find('.server').attr('data-server', k).attr('data-iid', v.iid).attr('data-sid', v.sid);
+					elem.find('.server .server_id .value').html(k);
+					if(k == "FRONTEND" || v.status == "no check") {
+						elem.find('.batch').hide();
+						elem.find('.weight').hide();
+						elem.find(".set_status").hide();
+					} else {
+						elem.find('.weight .set').button('enable');
+						if(v.status.match(/UP/)) {
+							elem.find('.status_enabled').button('disable');
+							elem.find('.status_disabled').button('enable');
+							self.state = true;
+						} else if (v.status.match(/MAINT/)) {
+							elem.find('.status_enabled').button('enable');
+							elem.find('.status_disabled').button('disable');
+							self.state = false;
+						} else if (v.status.match(/DOWN/)) {
+							elem.find('.status_enabled, .status_disabled').button('disable');
+							self.state = null;
+						} else {
+							elem.find('.status_enabled, .status_disabled').button('disable');
+							console.log("UNKNOWN v.status [" + v.status + "]");
+							self.state = null;
+						}
+						// elem.find('.weight .value').html(v.weight);
+						elem.find('.weight .value').spinner("value",v.weight);
+					}
+					elem.find('.status .value').html(v.status);
+
+				},
+				draw: function(data) {
+					var self = this, o = self.options, elem = self.element;
+					elem.append(self.empty);
+					elem.find('.set_status button').button();
+					elem.find('.server .batch').button().click(function () {
+						var text = $("#haproxy_batch").text();
+						var obj = {};
+						var backend = elem.parents('.backend').first().attr("data-backend");
+						var server = elem.find('.server').attr("data-server");
+						obj[backend + "/" + server] = {enabled: self.state, weight: elem.find('.server .weight .value').spinner("value")};
+						var batch = JSON.parse($("#haproxy_batch_text").text());
+						$.extend(batch,obj);
+						
+						$("#haproxy_batch_text").text(JSON.stringify(batch,null,'  '));
+					});
+					elem.find('.weight .value').spinner({min: 1, max: 100});
+					elem.find('.weight .set').button().click(function () {
+						$(this).button('disable');
+						//do the enable-disable here
+						var update = {};
+						update[$(this).parents('.backend').first().attr('data-backend') + '/' + 
+							$(this).parents('.server').first().attr('data-server')] = {weight: $(this).parent().find('.value').spinner("value")};
+						$.ajax(
+							{url:'/update', 
+							 type: 'POST', 
+							 data: JSON.stringify(update)
+							}).done(function (data) { 
+								var backendName = elem.parents('.backend').first().attr('data-backend');
+								var serverName = elem.find('.server').first().attr('data-server');
+								var obj = {};
+								obj[serverName] = data[backendName][serverName];
+								self.set(obj);
+							});
+					});
+					elem.find(".set_status button").click(function(e) {
+						$(this).button('disable');
+						//do the enable-disable here
+						var update = {};
+						update[$(this).parents('.backend').first().attr('data-backend') + '/' + 
+							$(this).parents('.server').first().attr('data-server')] = {enabled: (
+								$(this).text() === "UP") ? true : false
+						    };
+						//console.log(update);
+						$.ajax(
+							{url:'/update', 
+							 type: 'POST', 
+							 data: JSON.stringify(update)
+							}).done(function (data) { 
+								var backendName = elem.parents('.backend').first().attr('data-backend');
+								var serverName = elem.find('.server').first().attr('data-server');
+								//console.log('finding [' + backendName + '][' + serverName + ']');
+								//console.log(data[backendName][serverName]);
+								var obj = {};
+								obj[serverName] = data[backendName][serverName];
+								self.set(obj);
+							});
+						// console.log($(this).parents('.backend').first().attr('data-backend') + '/' + 
+						// 	$(this).parents('.server').first().attr('data-server') + ' ' + $(this).attr('value'));
+					});
+					elem.find('.weight .value').click(function() {
+
+					});
+					self.set(data);
+				}
+			});
+
+
+			$.widget("haproxy.controller", {
+				options: {
+					updateInterval: 20000
+				},
+				updateAll: function() {
+					var self = this; o = self.options, elem = self.element;
+					if (self.updateRunning) return;
+					self.updateRunning = true;
+					$.ajax(
+						{url:'/status', 
+						 type: 'GET'
+						}).done(function (data) { 
+							$.each(data, function(key, value) {
+								elem.find('.backend[data-backend="' + key + '"]').parent().backend("set",value);
+							});							
+						}).always(function () {
+							self.updateRunning = undefined;
+							setTimeout(function () {self.updateAll()}, o.updateInterval);
+						});
+				},
+				_create: function() {
+					var self = this,
+						o = self.options;
+
+					$.ajax({
+						"url": "/status",
+						"method": "GET"
+					}).done(function(data) {
+						self.status = data;
+						self._draw();
+					});
+
+					setTimeout(function () {self.updateAll()}, o.updateInterval);
+
+				},
+				_draw: function() {							
+					var self = this, o = self.options, elem = self.element;
+					var $batch = $('<div id="haproxy_batch" />').append($('<button id="haproxy_batch_submit">Batch Stat Change</button>').click(function() {
+							$.ajax(
+							{url:'/update', 
+							 type: 'POST', 
+							 data: $('#haproxy_batch_text').val()
+							}).done(function (data) { 
+								$.each(data, function(key, value) {
+									elem.find('.backend[data-backend="' + key + '"]').parent().backend("set",value);
+								});								
+							});
+					})).append($('<textarea id="haproxy_batch_text">{}</textarea>'));
+					elem.append($batch);
+
+					$.each(self.status, function(key, value) {
+						var data = {};
+						data[key] = value;
+						var $backend = $('<div/>').backend();
+						elem.append($backend);
+						$backend.backend('draw', data);
+					});
+				}
+
+			});
+			$(function() {
+				$('#main').controller();				
+			});
+
+		</script>
+	</head>
+	
+	<body>
+		<div id="main"></div>
+	</body>
+</html>

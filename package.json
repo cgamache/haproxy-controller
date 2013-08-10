@@ -1,0 +1,33 @@
+{
+    "name": "haproxy-controller",
+    "description": "Interactive and REST interface to control haproxy",
+    "version": "0.1.0",
+    "author": "Chris Gamache <chrisgamachecodes@gmail.com>",
+    "contributors": [
+        {
+            "name": "Chris Gamache",
+            "email": "chrisgamachecodes@gmail.com"
+        }
+    ],
+    "dependencies": {
+        "haproxy-sock-handler": ">= 0.1.0",
+        "node-static": ">= 0.7.0",
+        "underscore": ">= 1.5.1"
+    },
+    "keywords": [
+        "haproxy",
+        "restful",
+        "interactive",
+        "web",
+        "load",
+        "balance"
+    ],
+    "repository": "https://github.com/cgamache/haproxy-controller.git",
+    "bin": {
+        "haproxy-controller": "./bin/haproxy-controller"
+    },
+    "main": "controller.js",
+    "engines": {
+        "node": ">= 0.4.4"
+    }
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env /usr/local/bin/node
+
+var http = require('http');
+var url = require('url');
+var fs = require('fs');
+var nodeStatic = require('node-static');
+var net = require('net');
+var _ = require('underscore')
+var haproxy = require('haproxy-sock-handler');
+
+var controller = require('../controller.js');
+
+controller.init();

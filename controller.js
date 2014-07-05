@@ -1,4 +1,3 @@
-
 var http = require('http');
 var url = require('url');
 var fs = require('fs');
@@ -30,7 +29,8 @@ module.exports = {
             var output = JSON.stringify(data);
             response.writeHead(200, {
               "Content-Type": "text/json",
-              "Content-Length": output.length
+              "Content-Length": output.length,
+              "Access-Control-Allow-Origin": "*"
             });
             response.end(output);
           });
@@ -42,7 +42,8 @@ module.exports = {
             var output = JSON.stringify(data);
             response.writeHead(200, {
               "Content-Type": "text/json",
-              "Content-Length": output.length
+              "Content-Length": output.length,
+              "Access-Control-Allow-Origin": "*"
             });
             response.end(output);
           });
@@ -97,7 +98,8 @@ module.exports = {
                 var outputString = JSON.stringify(stats);
                 response.writeHead(200, {
                     "Content-Type": "text/json",
-                    "Content-Length": outputString.length
+                    "Content-Length": outputString.length,
+                    "Access-Control-Allow-Origin": "*"
                   });
                   response.end(outputString);
                 });
